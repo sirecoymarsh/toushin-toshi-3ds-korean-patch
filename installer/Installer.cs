@@ -1,4 +1,5 @@
-// 투신도시 3DS 한국어 패치 설치 프로그램 (Claude, 2026-10-24)
+// 투신도시 3DS 한국어 패치 설치 프로그램 v1.0.1 (Claude, 2026-10-24)
+// 실행 코드 속 글 패치 code.ips 는 exefs\code.ips(Azahar)와 code.ips(Luma) 두 자리에 넣는다(IPS 라 두 번 적용돼도 결과가 같다).
 // 사용자 원본(복호화 롬 파일 또는 romfs 폴더)에서 파일 245개를 읽어 xdelta 를 적용하고
 // Azahar 모드 폴더 / 3DS SD 카드(luma\titles) / 고른 폴더에 0004000000112000\romfs 로 넣는다.
 // 명령 줄(시험용): --source <롬|폴더> --target-dir <...\0004000000112000> [--log <파일>]
@@ -138,6 +139,7 @@ namespace TT3KoPatch
     {
         public const string TitleId = "0004000000112000";
         public const string Marker = "tt3_korean_patch.txt";
+        public const string Version = "1.0.1";
         public static string BaseDir = AppDomain.CurrentDomain.BaseDirectory;
 
         public static List<Entry> LoadManifest()
@@ -197,8 +199,42 @@ namespace TT3KoPatch
             }
         }
 
+        [System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode, SetLastError = true)]
+        static extern IntPtr CreateFileW(string name, uint access, uint share, IntPtr sec, uint disp, uint flags, IntPtr tmpl);
+        [System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode, SetLastError = true)]
+        static extern uint GetFinalPathNameByHandleW(IntPtr h, StringBuilder buf, uint len, uint flags);
+        [System.Runtime.InteropServices.DllImport("kernel32.dll")]
+        static extern bool CloseHandle(IntPtr h);
+
+        // 정션·심볼릭 링크를 실제 경로로 푼다(예: %APPDATA%\Azahar 가 다른 드라이브로 가는 정션이면
+        // 그 아래에서 폴더 이름 바꾸기가 「경로를 찾을 수 없음」으로 실패한다 — 10-24 이 PC에서 겪음).
+        public static string Resolve(string path)
+        {
+            string full = Path.GetFullPath(path), tail = "", cur = full;
+            while (cur != null && !Directory.Exists(cur))
+            {
+                tail = Path.Combine(Path.GetFileName(cur), tail);
+                cur = Path.GetDirectoryName(cur);
+            }
+            if (cur == null) return full;
+            IntPtr h = CreateFileW(cur, 0, 7, IntPtr.Zero, 3, 0x02000000, IntPtr.Zero); // FILE_FLAG_BACKUP_SEMANTICS
+            if (h == new IntPtr(-1)) return full;
+            try
+            {
+                StringBuilder sb = new StringBuilder(1024);
+                uint n = GetFinalPathNameByHandleW(h, sb, (uint)sb.Capacity, 0);
+                if (n == 0 || n >= sb.Capacity) return full;
+                string real = sb.ToString();
+                if (real.StartsWith(@"\\?\UNC\")) real = @"\\" + real.Substring(8);
+                else if (real.StartsWith(@"\\?\")) real = real.Substring(4);
+                return tail.Length > 0 ? Path.Combine(real, tail.TrimEnd('\\')) : real;
+            }
+            finally { CloseHandle(h); }
+        }
+
         public static void Install(ISource src, string tidDir, Action<string> log, Action<int, int> progress)
         {
+            tidDir = Resolve(tidDir);
             List<Entry> list = LoadManifest();
             log("원본: " + src.Describe);
             log("설치할 곳: " + tidDir);
@@ -239,12 +275,24 @@ namespace TT3KoPatch
             }
             finally { try { Directory.Delete(tmp, true); } catch { } }
             if (done == 0) { try { Directory.Delete(staging, true); } catch { } throw new PatchError("파일을 하나도 패치하지 못했습니다. 원본(롬이나 romfs 폴더)을 확인하세요."); }
+            // 실행 코드 속 글(능력치 이름·레벨업 문구 등). 원본이 필요 없는 IPS 라 그대로 복사한다.
+            string ips = Path.Combine(BaseDir, "patch", "code.ips");
+            bool codeDone = false;
+            if (File.Exists(ips))
+            {
+                Directory.CreateDirectory(Path.Combine(staging, "exefs"));
+                File.Copy(ips, Path.Combine(staging, "exefs", "code.ips"), true);
+                File.Copy(ips, Path.Combine(staging, "code.ips"), true);
+                codeDone = true;
+                log("실행 코드 패치(code.ips)를 넣었습니다.");
+            }
+            else log("patch\\code.ips 가 없어 실행 코드 패치는 건너뜁니다.");
             if (differ > 0) log("원본이 기대와 다른 파일: " + differ + "개(그래도 적용함)");
             if (outDiffer > 0) log("결과가 기대와 다른 파일: " + outDiffer + "개(원본이 다르면 생길 수 있음)");
             foreach (string sk in skipped) log("  건너뜀: " + sk);
             File.WriteAllText(Path.Combine(staging, Marker),
-                "투신도시 3DS 한국어 패치 v1.0\r\n설치: " + DateTime.Now.ToString("yyyy-MM-dd HH:mm") + "\r\n파일: " + done + "/" + list.Count +
-                "\r\n원본이 기대와 다른 파일: " + differ + "\r\n결과가 기대와 다른 파일: " + outDiffer + "\r\n건너뛴 파일: " + skipped.Count + "\r\n", Encoding.UTF8);
+                "투신도시 3DS 한국어 패치 v" + Version + "\r\n설치: " + DateTime.Now.ToString("yyyy-MM-dd HH:mm") + "\r\n파일: " + done + "/" + list.Count +
+                "\r\n원본이 기대와 다른 파일: " + differ + "\r\n결과가 기대와 다른 파일: " + outDiffer + "\r\n건너뛴 파일: " + skipped.Count + "\r\n실행 코드 패치: " + (codeDone ? "넣음" : "없음") + "\r\n", Encoding.UTF8);
             // 3) 바꿔 넣기 (원래 있던 폴더는 백업)
             if (Directory.Exists(tidDir))
             {
@@ -259,6 +307,7 @@ namespace TT3KoPatch
 
         public static void Uninstall(string tidDir, Action<string> log)
         {
+            tidDir = Resolve(tidDir);
             if (!Directory.Exists(tidDir)) throw new PatchError("설치된 패치가 없습니다: " + tidDir);
             if (!File.Exists(Path.Combine(tidDir, Marker))) throw new PatchError("이 폴더는 이 설치 프로그램이 넣은 것이 아니라 지우지 않았습니다:\r\n" + tidDir);
             Microsoft.VisualBasic.FileIO.FileSystem.DeleteDirectory(tidDir,
@@ -281,7 +330,7 @@ namespace TT3KoPatch
 
         public MainForm()
         {
-            Text = "투신도시 3DS 한국어 패치 v1.0 설치";
+            Text = "투신도시 3DS 한국어 패치 v" + Core.Version + " 설치";
             Font = new Font("맑은 고딕", 9f);
             ClientSize = new Size(640, 560); FormBorderStyle = FormBorderStyle.FixedDialog; MaximizeBox = false;
             StartPosition = FormStartPosition.CenterScreen;
