@@ -4,7 +4,7 @@
 
 게임 데이터는 들어 있지 않고, 원본과의 차이(xdelta)만 들어 있습니다. 설치 프로그램이 가지고 계신 원본에서 한국어 파일을 만들어 모드 폴더(LayeredFS)에 넣습니다. 롬 파일 자체는 고치지 않습니다.
 
-**받기:** [Releases](../../releases/latest)에서 `투신도시3DS_한국어패치_v1.0.zip`
+**받기:** [Releases](../../releases/latest)에서 `ToushinToshi3DS_Korean_Patch_v1.0.zip`
 
 ## 한국어로 바뀌는 것
 
