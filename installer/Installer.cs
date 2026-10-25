@@ -1,4 +1,4 @@
-// 투신도시 3DS 한국어 패치 설치 프로그램 v1.0.1 (Claude, 2026-10-24)
+// 투신도시 3DS 한국어 패치 설치 프로그램 v1.1.0 (Claude, 2026-10-24; v1.1.0 은 10-25)
 // 실행 코드 속 글 패치 code.ips 는 exefs\code.ips(Azahar)와 code.ips(Luma) 두 자리에 넣는다(IPS 라 두 번 적용돼도 결과가 같다).
 // 사용자 원본(복호화 롬 파일 또는 romfs 폴더)에서 파일 245개를 읽어 xdelta 를 적용하고
 // Azahar 모드 폴더 / 3DS SD 카드(luma\titles) / 고른 폴더에 0004000000112000\romfs 로 넣는다.
@@ -139,7 +139,7 @@ namespace TT3KoPatch
     {
         public const string TitleId = "0004000000112000";
         public const string Marker = "tt3_korean_patch.txt";
-        public const string Version = "1.0.1";
+        public const string Version = "1.1.0";
         public static string BaseDir = AppDomain.CurrentDomain.BaseDirectory;
 
         public static List<Entry> LoadManifest()
